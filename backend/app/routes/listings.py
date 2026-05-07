@@ -11,7 +11,6 @@ LISTINGS_COLLECTION = "listings"
 
 @router.post("/", response_model=ListingResponse)
 async def create_listing(listing: ListingCreate, current_user = Depends(get_current_user)):
-    """Farmer posts a new crop listing (authenticated)"""
     doc_ref = db.collection(LISTINGS_COLLECTION).document()
     listing_data = listing.dict()
     listing_data.update({
@@ -25,7 +24,6 @@ async def create_listing(listing: ListingCreate, current_user = Depends(get_curr
 
 @router.get("/", response_model=List[ListingResponse])
 async def get_active_listings():
-    """Get all active listings (public)"""
     docs = db.collection(LISTINGS_COLLECTION).where("status", "==", "active").stream()
     listings = []
     for doc in docs:
@@ -36,7 +34,6 @@ async def get_active_listings():
 
 @router.get("/{listing_id}", response_model=ListingResponse)
 async def get_listing(listing_id: str):
-    """Get a single listing by ID"""
     doc = db.collection(LISTINGS_COLLECTION).document(listing_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -46,7 +43,6 @@ async def get_listing(listing_id: str):
 
 @router.get("/my-listings", response_model=List[ListingResponse])
 async def get_my_listings(current_user = Depends(get_current_user)):
-    """Get listings posted by the authenticated farmer"""
     docs = db.collection(LISTINGS_COLLECTION).where("farmer_id", "==", current_user['uid']).stream()
     listings = []
     for doc in docs:

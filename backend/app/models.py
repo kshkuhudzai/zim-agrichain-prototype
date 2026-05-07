@@ -2,14 +2,17 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-# ========== Listing (Farmer posts crop for sale) ==========
 class ListingCreate(BaseModel):
     farmer_id: str
     crop_name: str
     quantity_kg: float
     price_per_kg: float
-    location: str
-    destination: str          # NEW: drop-off location
+    location: Optional[str] = None
+    pickup_lat: float
+    pickup_lng: float
+    destination: Optional[str] = None   
+    dest_lat: float
+    dest_lng: float
     harvest_date: str
     notes: Optional[str] = None
 
@@ -19,14 +22,17 @@ class ListingResponse(BaseModel):
     crop_name: str
     quantity_kg: float
     price_per_kg: float
-    location: str
-    destination: str          # NEW
+    location: Optional[str] = None
+    pickup_lat: float
+    pickup_lng: float
+    destination: Optional[str] = None
+    dest_lat: float
+    dest_lng: float
     status: str
     created_at: datetime
     harvest_date: str
     notes: Optional[str] = None
 
-# ========== Bid (Driver offers transport) ==========
 class BidCreate(BaseModel):
     listing_id: str
     driver_id: str
@@ -44,7 +50,6 @@ class BidResponse(BaseModel):
     vehicle_type: str
     estimated_arrival_hours: int
 
-# ========== Transaction (Immutable log) ==========
 class TransactionRecord(BaseModel):
     listing_id: str
     buyer_id: str
