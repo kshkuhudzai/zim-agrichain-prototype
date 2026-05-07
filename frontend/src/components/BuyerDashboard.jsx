@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 
 export default function BuyerDashboard({ onBack }) {
   const [listings, setListings] = useState([]);
+  const currentUser = auth.currentUser;
+  const userName = currentUser?.displayName || currentUser?.email || 'Buyer';
 
   useEffect(() => {
     fetchActiveListings();
@@ -24,8 +26,11 @@ export default function BuyerDashboard({ onBack }) {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-purple-800">Buyer Dashboard</h1>
-          <button onClick={onBack} className="text-gray-600 hover:text-gray-800">← Change Role</button>
+          <div>
+            <h1 className="text-2xl font-bold text-purple-800">Buyer Dashboard</h1>
+            <p className="text-gray-600">Welcome, {userName}!</p>
+          </div>
+          <button onClick={onBack} className="text-gray-600 hover:text-gray-800">Sign Out</button>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">Available Produce</h2>

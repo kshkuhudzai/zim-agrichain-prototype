@@ -5,11 +5,12 @@ from datetime import datetime
 # ========== Listing (Farmer posts crop for sale) ==========
 class ListingCreate(BaseModel):
     farmer_id: str
-    crop_name: str          # e.g., "Maize", "Tomatoes"
+    crop_name: str
     quantity_kg: float
     price_per_kg: float
-    location: str           # e.g., "Harare", "Bulawayo"
-    harvest_date: str       # ISO format date
+    location: str
+    destination: str          # NEW: drop-off location
+    harvest_date: str
     notes: Optional[str] = None
 
 class ListingResponse(BaseModel):
@@ -19,7 +20,8 @@ class ListingResponse(BaseModel):
     quantity_kg: float
     price_per_kg: float
     location: str
-    status: str             # "active", "matched", "delivered"
+    destination: str          # NEW
+    status: str
     created_at: datetime
     harvest_date: str
     notes: Optional[str] = None
@@ -28,8 +30,8 @@ class ListingResponse(BaseModel):
 class BidCreate(BaseModel):
     listing_id: str
     driver_id: str
-    bid_price: float          # Transport cost
-    vehicle_type: str         # "truck", "van", "pickup"
+    bid_price: float
+    vehicle_type: str
     estimated_arrival_hours: int
 
 class BidResponse(BaseModel):
@@ -37,7 +39,7 @@ class BidResponse(BaseModel):
     listing_id: str
     driver_id: str
     bid_price: float
-    status: str               # "pending", "accepted", "rejected"
+    status: str
     created_at: datetime
     vehicle_type: str
     estimated_arrival_hours: int
@@ -47,7 +49,7 @@ class TransactionRecord(BaseModel):
     listing_id: str
     buyer_id: str
     driver_id: str
-    final_price: float        # Crop price + transport
-    status: str               # "completed", "disputed"
-    blockchain_ref: str       # Mock transaction hash
+    final_price: float
+    status: str
+    blockchain_ref: str
     timestamp: datetime
