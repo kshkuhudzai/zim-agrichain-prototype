@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth, getFirebaseToken } from '../firebase';
 import DriverMap from './DriverMap';
+import OrderHistory from './OrderHistory';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 function getDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -22,11 +23,11 @@ export default function DriverDashboard({ onBack }) {
   const [myBids, setMyBids] = useState([]);
   const [driverLocation, setDriverLocation] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
   const currentUser = auth.currentUser;
   const driverId = currentUser?.uid;
   const userName = currentUser?.displayName || currentUser?.email || 'Driver';
 
-  // Get driver's approximate location once
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -37,12 +38,10 @@ export default function DriverDashboard({ onBack }) {
     }
   }, []);
 
-  // Fetch data initially
   useEffect(() => {
     fetchAllData();
   }, []);
 
-  // When allActiveListings or myBids change, recompute availableListings (exclude those driver already bid on)
   useEffect(() => {
     if (allActiveListings.length > 0 && myBids.length > 0) {
       const bidListingIds = myBids.map(bid => bid.listing_id);
@@ -71,29 +70,20 @@ export default function DriverDashboard({ onBack }) {
   const fetchMyBids = async () => {
     if (!driverId) return;
     try {
-      const q = query(collection(db, 'bids'), where('driver_id', '==', driverId));
-      const snapshot = await getDocs(q);
-      const bids = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // enrich with listing details
-      const enriched = [];
-      for (const bid of bids) {
-        const listingDoc = await getDocs(query(collection(db, 'listings'), where('id', '==', bid.listing_id)));
-        if (!listingDoc.empty) {
-          const listing = listingDoc.docs[0].data();
-          enriched.push({
-            ...bid,
-            crop_name: listing.crop_name,
-            pickup_lat: listing.pickup_lat,
-            pickup_lng: listing.pickup_lng,
-            dest_lat: listing.dest_lat,
-            dest_lng: listing.dest_lng,
-            location: listing.location
-          });
-        } else {
-          enriched.push(bid);
-        }
+      const token = await getFirebaseToken();
+      const res = await fetch(`${API_BASE}/bids/my-bids`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMyBids(data);
+      } else {
+        // fallback to direct Firestore query
+        const q = query(collection(db, 'bids'), where('driver_id', '==', driverId));
+        const snapshot = await getDocs(q);
+        const bids = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMyBids(bids);
       }
-      setMyBids(enriched);
     } catch (error) { console.error(error); }
   };
 
@@ -115,7 +105,6 @@ export default function DriverDashboard({ onBack }) {
       });
       if (response.ok) {
         alert('Bid placed!');
-        // Refresh data so the listing disappears from available loads
         await fetchAllData();
       } else {
         const err = await response.json();
@@ -129,11 +118,9 @@ export default function DriverDashboard({ onBack }) {
     if (price) placeBid(listingId, price);
   };
 
-  // Live location sharing if any accepted bid
   useEffect(() => {
     const acceptedBid = myBids.find(bid => bid.status === 'accepted');
     if (!acceptedBid) return;
-
     const interval = setInterval(async () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -150,6 +137,10 @@ export default function DriverDashboard({ onBack }) {
     return () => clearInterval(interval);
   }, [myBids]);
 
+  if (showHistory) {
+    return <OrderHistory onBack={() => setShowHistory(false)} />;
+  }
+
   if (loading) return <div className="flex justify-center items-center h-screen">Loading available loads...</div>;
 
   return (
@@ -160,17 +151,18 @@ export default function DriverDashboard({ onBack }) {
             <h1 className="text-2xl font-bold text-blue-800">Driver Dashboard</h1>
             <p className="text-gray-600">Welcome, {userName}!</p>
           </div>
-          <button onClick={onBack} className="text-gray-600">Sign Out</button>
+          <div className="space-x-2">
+            <button onClick={() => setShowHistory(true)} className="text-blue-600 hover:text-blue-800">Order History</button>
+            <button onClick={onBack} className="text-gray-600 hover:text-gray-800">Sign Out</button>
+          </div>
         </div>
 
-        {/* Map View – only listings driver hasn't bid on */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Nearby Loads (Map)</h2>
           <DriverMap listings={availableListings} onPlaceBid={handlePlaceBidFromMap} />
           {availableListings.length === 0 && <p className="text-gray-500 text-center mt-2">No new loads available. Check back later.</p>}
         </div>
 
-        {/* List View with Distance */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Available Loads (List)</h2>
           {availableListings.length === 0 ? (
@@ -192,7 +184,6 @@ export default function DriverDashboard({ onBack }) {
           )}
         </div>
 
-        {/* My Bids (including pending, accepted, rejected) */}
         <div className="bg-white rounded-xl shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">My Bids</h2>
           {myBids.length === 0 ? (

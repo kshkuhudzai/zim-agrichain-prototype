@@ -3,14 +3,15 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth, getFirebaseToken } from '../firebase';
 import MapPicker from './MapPicker';
 import DestinationMapPicker from './DestinationMapPicker';
+import OrderHistory from './OrderHistory';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 export default function FarmerDashboard({ onBack }) {
   const [cropName, setCropName] = useState('');
   const [quantityKg, setQuantityKg] = useState('');
   const [pricePerKg, setPricePerKg] = useState('');
-  const [destinationText, setDestinationText] = useState(''); // optional human-readable
+  const [destinationText, setDestinationText] = useState('');
   const [harvestDate, setHarvestDate] = useState('');
   const [pickupLat, setPickupLat] = useState(null);
   const [pickupLng, setPickupLng] = useState(null);
@@ -20,6 +21,7 @@ export default function FarmerDashboard({ onBack }) {
   const [bidsForListing, setBidsForListing] = useState({});
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
+  const [showHistory, setShowHistory] = useState(false);
 
   const currentUser = auth.currentUser;
   const farmerId = currentUser?.uid;
@@ -140,12 +142,22 @@ export default function FarmerDashboard({ onBack }) {
     setLoading(false);
   };
 
+  if (showHistory) {
+    return <OrderHistory onBack={() => setShowHistory(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <div><h1 className="text-2xl font-bold text-green-800">Farmer Dashboard</h1><p className="text-gray-600">Welcome, {userName}!</p></div>
-          <button onClick={onBack} className="text-gray-600">Sign Out</button>
+          <div>
+            <h1 className="text-2xl font-bold text-green-800">Farmer Dashboard</h1>
+            <p className="text-gray-600">Welcome, {userName}!</p>
+          </div>
+          <div className="space-x-2">
+            <button onClick={() => setShowHistory(true)} className="text-blue-600 hover:text-blue-800">Order History</button>
+            <button onClick={onBack} className="text-gray-600 hover:text-gray-800">Sign Out</button>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
@@ -175,8 +187,8 @@ export default function FarmerDashboard({ onBack }) {
           {myListings.length === 0 ? <p>No listings yet.</p> : myListings.map(listing => (
             <div key={listing.id} className="border rounded-lg p-4 mb-4">
               <p className="font-semibold">{listing.crop_name} - {listing.quantity_kg}kg @ ${listing.price_per_kg}/kg</p>
-              <p className="text-sm">Pickup: {listing.location || `${listing.pickup_lat},${listing.pickup_lng}`}</p>
-              <p className="text-sm">Destination: {listing.destination || `${listing.dest_lat},${listing.dest_lng}`}</p>
+              <p className="text-sm">Pickup: {listing.location || `${listing.pickup_lat.toFixed(4)},${listing.pickup_lng.toFixed(4)}`}</p>
+              <p className="text-sm">Destination: {listing.destination || `${listing.dest_lat?.toFixed(4) || '?'},${listing.dest_lng?.toFixed(4) || '?'}`}</p>
               <p className="text-sm">Status: <span className={`font-bold ${listing.status === 'active' ? 'text-green-600' : 'text-gray-600'}`}>{listing.status}</span></p>
               <div className="mt-2">
                 <h3 className="font-medium">Bids:</h3>

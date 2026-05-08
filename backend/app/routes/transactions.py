@@ -1,63 +1,55 @@
-from fastapi import APIRouter, HTTPException
-from datetime import datetime
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException
+from ..auth_deps import get_current_user_role
 from .. import firebase_config
-from ..models import TransactionRecord
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 db = firebase_config.get_db()
-TRANSACTIONS_COLLECTION = "transactions"
-LISTINGS_COLLECTION = "listings"
-BIDS_COLLECTION = "bids"
 
 
-@router.post("/complete")
-async def complete_transaction(listing_id: str, buyer_id: str, driver_id: str, final_price: float):
-    """Create an immutable transaction record after delivery is confirmed"""
-    # Verify listing and bid exist
-    listing_doc = db.collection(LISTINGS_COLLECTION).document(listing_id).get()
-    if not listing_doc.exists:
-        raise HTTPException(status_code=404, detail="Listing not found")
+@router.get("/my")
+async def get_my_transactions(role_info=Depends(get_current_user_role)):
+    """
+    Return transactions where the current user is buyer, driver, or the farmer who owns the listing.
+    """
+    uid = role_info['uid']
+    role = role_info['role']
 
-    # Create transaction record with mock blockchain hash
-    doc_ref = db.collection(TRANSACTIONS_COLLECTION).document()
-    transaction_data = {
-        "id": doc_ref.id,
-        "listing_id": listing_id,
-        "buyer_id": buyer_id,
-        "driver_id": driver_id,
-        "final_price": final_price,
-        "status": "completed",
-        "blockchain_ref": f"mock_tx_{datetime.now().timestamp()}",  # Simulated blockchain hash
-        "timestamp": datetime.now()
-    }
-    doc_ref.set(transaction_data)
+    # First, get all listings where this user is the farmer
+    farmer_listing_ids = []
+    if role == 'farmer':
+        listings = db.collection("listings").where("farmer_id", "==", uid).stream()
+        farmer_listing_ids = [doc.id for doc in listings]
 
-    # Update listing status to delivered
-    db.collection(LISTINGS_COLLECTION).document(listing_id).update({"status": "delivered"})
-
-    return {"message": "Transaction recorded immutably", "transaction": transaction_data}
-
-
-@router.get("/listing/{listing_id}", response_model=List[dict])
-async def get_transactions_for_listing(listing_id: str):
-    """Get all transactions for a listing (audit trail)"""
-    docs = db.collection(TRANSACTIONS_COLLECTION).where("listing_id", "==", listing_id).stream()
+    # Query transactions: buyer_id == uid OR driver_id == uid OR listing_id in farmer_listing_ids
     transactions = []
-    for doc in docs:
-        data = doc.to_dict()
-        data["id"] = doc.id
-        transactions.append(data)
-    return transactions
+    # By buyer
+    buyer_tx = db.collection("transactions").where("buyer_id", "==", uid).stream()
+    # By driver
+    driver_tx = db.collection("transactions").where("driver_id", "==", uid).stream()
+    # By farmer (listing_id in list)
+    farmer_tx = []
+    if farmer_listing_ids:
+        # Firestore 'in' query limited to 10, so handle in batches or use a loop
+        for listing_id in farmer_listing_ids:
+            tx = db.collection("transactions").where("listing_id", "==", listing_id).stream()
+            farmer_tx.extend(tx)
 
+    all_docs = list(buyer_tx) + list(driver_tx) + farmer_tx
+    seen = set()
+    for doc in all_docs:
+        if doc.id not in seen:
+            seen.add(doc.id)
+            data = doc.to_dict()
+            data["id"] = doc.id
+            # Enrich with listing info (crop name etc.)
+            listing_doc = db.collection("listings").document(data["listing_id"]).get()
+            if listing_doc.exists:
+                listing_data = listing_doc.to_dict()
+                data["crop_name"] = listing_data.get("crop_name")
+                data["quantity_kg"] = listing_data.get("quantity_kg")
+                data["price_per_kg"] = listing_data.get("price_per_kg")
+            transactions.append(data)
 
-@router.get("/")
-async def get_all_transactions():
-    """Get all transactions (admin view)"""
-    docs = db.collection(TRANSACTIONS_COLLECTION).stream()
-    transactions = []
-    for doc in docs:
-        data = doc.to_dict()
-        data["id"] = doc.id
-        transactions.append(data)
+    # Sort by timestamp descending
+    transactions.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     return transactions

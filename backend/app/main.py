@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from . import firebase_config
-from .routes import listings, bids, transactions, drivers
+from .routes import listings, bids, transactions, drivers, users
 
 app = FastAPI(title="ZimAgriChain API", version="1.0.0")
 
@@ -22,6 +22,8 @@ app.include_router(listings.router)
 app.include_router(bids.router)
 app.include_router(transactions.router)
 app.include_router(drivers.router)
+app.include_router(users.router)
+app.include_router(transactions.router)
 @app.get("/")
 def root():
     return {"message": "ZimAgriChain API is running", "status": "operational"}

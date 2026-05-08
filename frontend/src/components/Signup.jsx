@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
@@ -83,6 +83,12 @@ export default function Signup({ onSwitchToLogin }) {
         role,
         createdAt: new Date().toISOString()
       });
+      // Send email verification
+      await sendEmailVerification(user);
+      alert('Verification email sent. Please verify your email before logging in.');
+      // Optionally sign out and go to login
+      await auth.signOut();
+      onSwitchToLogin();
     } catch (err) {
       let friendlyError = err.message;
       if (err.code === 'auth/email-already-in-use') {
@@ -109,24 +115,14 @@ export default function Signup({ onSwitchToLogin }) {
           <label className="block text-gray-700">Full Name</label>
           <input ref={nameRef} type="text" defaultValue="" required autoComplete="new-name" className="w-full border rounded px-3 py-2" />
         </div>
-
         <div className="mb-4">
           <label className="block text-gray-700">Email</label>
           <input ref={emailRef} type="email" defaultValue="" required autoComplete="new-email" className="w-full border rounded px-3 py-2" />
         </div>
-
         <div className="mb-4">
           <label className="block text-gray-700">Password</label>
           <div className="relative">
-            <input
-              ref={passwordRef}
-              type={showPassword ? "text" : "password"}
-              defaultValue=""
-              required
-              autoComplete="new-password"
-              className="w-full border rounded px-3 py-2 pr-10"
-              onChange={handlePasswordChange}
-            />
+            <input ref={passwordRef} type={showPassword ? "text" : "password"} defaultValue="" required autoComplete="new-password" className="w-full border rounded px-3 py-2 pr-10" onChange={handlePasswordChange} />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-600">
               {showPassword ? "🙈" : "👁️"}
             </button>
@@ -142,19 +138,10 @@ export default function Signup({ onSwitchToLogin }) {
             </div>
           )}
         </div>
-
         <div className="mb-4">
           <label className="block text-gray-700">Confirm Password</label>
           <div className="relative">
-            <input
-              ref={confirmPasswordRef}
-              type={showConfirmPassword ? "text" : "password"}
-              defaultValue=""
-              required
-              autoComplete="new-password"
-              className="w-full border rounded px-3 py-2 pr-10"
-              onChange={handleConfirmChange}
-            />
+            <input ref={confirmPasswordRef} type={showConfirmPassword ? "text" : "password"} defaultValue="" required autoComplete="new-password" className="w-full border rounded px-3 py-2 pr-10" onChange={handleConfirmChange} />
             <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-600">
               {showConfirmPassword ? "🙈" : "👁️"}
             </button>
@@ -162,7 +149,6 @@ export default function Signup({ onSwitchToLogin }) {
           {confirmPasswordMatch === false && <p className="text-red-600 text-xs mt-1">✗ Passwords do not match</p>}
           {confirmPasswordMatch === true && <p className="text-green-600 text-xs mt-1">✓ Passwords match</p>}
         </div>
-
         <div className="mb-4">
           <label className="block text-gray-700">I am a</label>
           <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full border rounded px-3 py-2">
@@ -171,7 +157,6 @@ export default function Signup({ onSwitchToLogin }) {
             <option value="buyer">Buyer (Market / Processor)</option>
           </select>
         </div>
-
         <button type="submit" disabled={loading} className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
           {loading ? 'Creating account...' : 'Sign Up'}
         </button>
